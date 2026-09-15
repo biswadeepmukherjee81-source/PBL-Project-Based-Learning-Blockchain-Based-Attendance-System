@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blockchain Attendance System — PBL-3 · Manipal University Jaipur</title>
+<meta name="description" content="A blockchain-based attendance system with performance analytics. PBL-3 mid-term prototype exploring Solidity smart contracts, MetaMask and ethers.js.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#07070a;
+    --bg-2:#0b0b10;
+    --panel: rgba(255,255,255,.035);
+    --panel-solid:#101015;
+    --line: rgba(255,255,255,.09);
+    --line-strong: rgba(255,255,255,.16);
+    --text:#f3f1ec;
+    --muted:#8d8d97;
+    --muted-2:#5f5f68;
+    --orange:#ff5e1a;
+    --orange-soft:#ffb066;
+    --violet:#b24bff;
+    --teal:#1fe0b0;
+    --cyan:#39c9ff;
+    --green:#3ddc84;
+    --red:#ff5470;
+    --display: "Space Grotesk", "Inter", sans-serif;
+    --body: "Inter", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --radius: 14px;
+    --ease: cubic-bezier(.16,.8,.24,1);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    *{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important}
+  }
+
+  body{
+    margin:0;
+    font-family:var(--body);
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:inherit}
+  img{max-width:100%;display:block}
+  ::selection{background:var(--orange);color:#0a0a0a}
+
+  h1,h2,h3{font-family:var(--display); letter-spacing:-.02em; margin:0}
+  p{margin:0}
+
+  :focus-visible{outline:2px solid var(--orange); outline-offset:3px; border-radius:4px}
+
+  /* ---------- ambient background layers ---------- */
+  #fx-canvas{
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:0; pointer-events:none; opacity:.55;
+  }
+  .grain{
+    position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.035; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .cursor-glow{
+    position:fixed; width:420px; height:420px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,94,26,.10), transparent 65%);
+    transform:translate(-50%,-50%); pointer-events:none; z-index:2;
+    transition:opacity .3s; will-change:transform;
+  }
+  @media (hover:none){ .cursor-glow{display:none} }
+
+  main, header, footer, nav{position:relative; z-index:3}
+
+  /* ---------- nav ---------- */
+  nav.top{
+    position:sticky; top:0; z-index:80;
+    background:rgba(7,7,10,.72); backdrop-filter:blur(16px) saturate(140%);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-in{
+    max-width:1240px; margin:auto; padding:16px 26px;
+    display:flex; align-items:center; justify-content:space-between; gap:20px;
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:600; font-size:16px}
+  .brand-mark{
+    width:26px; height:26px; border-radius:7px;
+    background:conic-gradient(from 200deg, var(--orange), var(--violet), var(--teal), var(--orange));
+    flex:none;
+  }
+  .brand small{display:block; font-family:var(--body); font-weight:400; font-size:10.5px; color:var(--muted); letter-spacing:.02em}
+
+  .nav-links{display:flex; gap:28px; font-size:14px; color:var(--muted)}
+  .nav-links a{position:relative; padding:4px 0; transition:color .2s}
+  .nav-links a:hover, .nav-links a.active{color:var(--text)}
+  .nav-links a.active:after{
+    content:""; position:absolute; left:0; right:0; bottom:-4px; height:2px;
+    background:var(--orange); border-radius:2px;
+  }
+
+  .wallet-pill{
+    font-family:var(--mono); font-size:12px; padding:7px 13px; border-radius:20px;
+    border:1px solid var(--line-strong); background:var(--panel); color:var(--muted);
+    display:flex; align-items:center; gap:7px; white-space:nowrap;
+  }
+  .wallet-dot{width:7px; height:7px; border-radius:50%; background:var(--muted-2); flex:none}
+  .wallet-pill.on .wallet-dot{background:var(--green); box-shadow:0 0 8px var(--green)}
+  .wallet-pill.on{color:var(--text); border-color:rgba(61,220,132,.35)}
+
+  .nav-toggle{display:none; background:none; border:1px solid var(--line-strong); color:var(--text); width:38px; height:38px; border-radius:9px; cursor:pointer; font-size:16px}
+
+  /* ---------- hero ---------- */
+  .hero{
+    min-height:92vh; display:flex; align-items:center;
+    padding:150px 26px 90px; position:relative;
+  }
+  .hero-grid{
+    max-width:1240px; margin:auto; width:100%;
+    display:grid; grid-template-columns:1.15fr .85fr; gap:40px; align-items:center;
+  }
+  .credit-line{
+    font-family:var(--mono); font-size:12px; color:var(--muted);
+    display:flex; align-items:center; gap:9px; margin-bottom:26px;
+    opacity:0; animation:rise .8s var(--ease) .1s forwards;
+  }
+  .credit-dot{width:6px; height:6px; border-radius:50%; background:var(--orange); box-shadow:0 0 10px var(--orange)}
+
+  .hero h1{
+    font-size:clamp(38px, 5.4vw, 72px); line-height:1.02; font-weight:600;
+    opacity:0; animation:rise .85s var(--ease) .22s forwards;
+  }
+  .hero h1 em{
+    font-style:normal; color:var(--orange); position:relative;
+  }
+  .hero p.lede{
+    margin-top:22px; max-width:540px; color:var(--muted); font-size:17px;
+    opacity:0; animation:rise .85s var(--ease) .36s forwards;
+  }
+  .hero-actions{
+    display:flex; gap:12px; flex-wrap:wrap; margin-top:34px;
+    opacity:0; animation:rise .85s var(--ease) .5s forwards;
+  }
+  .hero-meta{
+    display:flex; gap:26px; margin-top:52px; flex-wrap:wrap;
+    opacity:0; animation:rise .85s var(--ease) .64s forwards;
+  }
+  .hero-meta div{border-left:1px solid var(--line); padding-left:14px}
+  .hero-meta b{display:block; font-family:var(--display); font-size:19px; font-weight:600}
+  .hero-meta span{font-size:12.5px; color:var(--muted)}
+
+  @keyframes rise{ from{opacity:0; transform:translateY(16px)} to{opacity:1; transform:translateY(0)} }
+
+  /* buttons */
+  .btn{
+    display:inline-flex; align-items:center; gap:8px; padding:13px 22px; border-radius:10px;
+    font-weight:600; font-size:14px; cursor:pointer; border:1px solid transparent;
+    font-family:var(--body); transition:transform .2s var(--ease), background .2s, border-color .2s, color .2s;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn-primary{background:var(--orange); color:#0a0602}
+  .btn-primary:hover{background:var(--orange-soft)}
+  .btn-ghost{border-color:var(--line-strong); color:var(--text); background:transparent}
+  .btn-ghost:hover{border-color:var(--orange); color:var(--orange-soft)}
+  .btn-block{width:100%; justify-content:center}
+
+  /* hero 3d object */
+  .stage{
+    height:420px; display:flex; align-items:center; justify-content:center;
+    perspective:1100px; position:relative;
+    opacity:0; animation:fadeIn 1.1s var(--ease) .5s forwards;
+  }
+  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+  .cube{
+    width:180px; height:180px; position:relative; transform-style:preserve-3d;
+    animation:spin 16s linear infinite;
+  }
+  @keyframes spin{ from{transform:rotateX(-18deg) rotateY(0)} to{transform:rotateX(-18deg) rotateY(360deg)} }
+  .cube .face{
+    position:absolute; width:180px; height:180px; border:1px solid rgba(255,255,255,.25);
+    background-blend-mode:overlay; opacity:.94;
+  }
+  .cube .f1{transform:translateZ(90px); background:linear-gradient(135deg,var(--orange),var(--violet))}
+  .cube .f2{transform:rotateY(180deg) translateZ(90px); background:linear-gradient(135deg,var(--teal),var(--cyan))}
+  .cube .f3{transform:rotateY(90deg) translateZ(90px); background:linear-gradient(135deg,var(--violet),var(--cyan))}
+  .cube .f4{transform:rotateY(-90deg) translateZ(90px); background:linear-gradient(135deg,var(--orange),var(--teal))}
+  .cube .f5{transform:rotateX(90deg) translateZ(90px); background:linear-gradient(135deg,var(--cyan),var(--orange))}
+  .cube .f6{transform:rotateX(-90deg) translateZ(90px); background:linear-gradient(135deg,var(--violet),var(--orange))}
+  .stage-ring{
+    position:absolute; width:300px; height:300px; border-radius:50%;
+    border:1px solid var(--line); animation:spin2 24s linear infinite;
+  }
+  .stage-ring:nth-child(2){width:360px; height:360px; border-color:rgba(255,255,255,.05); animation-duration:34s; animation-direction:reverse}
+  @keyframes spin2{ from{transform:rotateX(70deg) rotateZ(0)} to{transform:rotateX(70deg) rotateZ(360deg)} }
+  .stage-glow{
+    position:absolute; width:280px; height:280px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,94,26,.22), transparent 70%);
+    filter:blur(10px);
+  }
+
+  .scroll-cue{
+    position:absolute; bottom:36px; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    color:var(--muted-2); font-size:11px; font-family:var(--mono);
+    opacity:0; animation:fadeIn 1s ease .9s forwards;
+  }
+  .scroll-cue i{width:1px; height:30px; background:linear-gradient(var(--orange), transparent); display:block; animation:scrolldown 1.8s ease infinite}
+  @keyframes scrolldown{ 0%{opacity:0; transform:scaleY(0); transform-origin:top} 40%{opacity:1; transform:scaleY(1); transform-origin:top} 100%{opacity:0; transform:scaleY(1); transform-origin:bottom} }
+
+  /* ---------- sections ---------- */
+  section{max-width:1240px; margin:auto; padding:120px 26px}
+  .kicker{
+    display:inline-flex; align-items:center; gap:9px; color:var(--orange-soft);
+    font-family:var(--mono); font-size:12.5px; margin-bottom:16px;
+  }
+  .kicker i{width:14px; height:1px; background:var(--orange)}
+  h2.title{font-size:clamp(28px,3.4vw,42px); font-weight:600; max-width:620px}
+  p.sub{color:var(--muted); max-width:560px; margin-top:16px; font-size:15.5px}
+
+  .reveal{opacity:0; transform:translateY(24px); transition:opacity .7s var(--ease), transform .7s var(--ease)}
+  .reveal.in{opacity:1; transform:translateY(0)}
+
+  /* overview */
+  .overview-grid{display:grid; grid-template-columns:.9fr 1.1fr; gap:26px; margin-top:52px; align-items:stretch}
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:30px; backdrop-filter:blur(6px);
+  }
+  .panel.tight{padding:24px}
+  .tag-sm{font-family:var(--mono); font-size:11.5px; color:var(--muted); text-transform:none; margin-bottom:10px; display:block}
+  .panel h3{font-size:19px; margin-bottom:10px; font-weight:600}
+  .panel p{color:var(--muted); font-size:14.5px}
+  .panel.problem{border-color:rgba(255,84,112,.25)}
+  .panel.approach{border-color:rgba(31,224,176,.25)}
+
+  /* concept pillars */
+  .pillars{display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-top:52px}
+  .pillar{border:1px solid var(--line); border-radius:var(--radius); padding:24px; background:var(--panel)}
+  .pillar .icon{
+    width:38px; height:38px; border-radius:9px; margin-bottom:16px;
+    display:flex; align-items:center; justify-content:center; background:rgba(255,94,26,.1); color:var(--orange-soft);
+  }
+  .pillar h3{font-size:16px; margin-bottom:8px; font-weight:600}
+  .pillar p{color:var(--muted); font-size:13.7px}
+
+  /* workflow stepper */
+  .flow{
+    display:grid; grid-template-columns:repeat(5,1fr); gap:0; margin-top:56px; position:relative;
+  }
+  .flow:before{
+    content:""; position:absolute; top:22px; left:5%; right:5%; height:1px;
+    background:linear-gradient(90deg, var(--line), var(--orange), var(--line));
+  }
+  .flow-step{padding:0 14px 0 0; position:relative}
+  .flow-num{
+    width:44px; height:44px; border-radius:50%; background:var(--bg-2); border:1px solid var(--line-strong);
+    display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:13px;
+    color:var(--orange-soft); margin-bottom:18px; position:relative; z-index:2;
+  }
+  .flow-step h3{font-size:15.5px; margin-bottom:8px; font-weight:600}
+  .flow-step p{font-size:13.3px; color:var(--muted)}
+
+  /* console / demo */
+  .console{
+    margin-top:52px; border:1px solid var(--line); border-radius:18px; overflow:hidden;
+    background:linear-gradient(180deg, var(--panel), rgba(255,255,255,.015));
+  }
+  .console-head{
+    padding:18px 26px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .console-head b{font-weight:600; font-size:14.5px}
+  .status-chip{font-family:var(--mono); font-size:11px; padding:5px 10px; border-radius:20px; border:1px solid var(--line-strong); color:var(--muted)}
+  .console-body{padding:30px; display:grid; grid-template-columns:1fr 1fr; gap:34px}
+  .field{margin-bottom:16px}
+  label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:7px}
+  input, select{
+    width:100%; padding:11px 14px; border-radius:9px; border:1px solid var(--line-strong);
+    background:var(--bg-2); color:var(--text); font-family:var(--body); font-size:14px;
+  }
+  input:focus, select:focus{outline:none; border-color:var(--orange)}
+  .output{
+    background:var(--bg-2); border:1px solid var(--line); border-radius:10px; padding:20px;
+    min-height:160px; font-size:14px;
+  }
+  .output .muted{color:var(--muted)}
+  .progress-track{height:7px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; margin:12px 0}
+  .progress-fill{height:100%; background:linear-gradient(90deg,var(--orange),var(--orange-soft)); width:0%; transition:width .5s var(--ease)}
+  .badge{display:inline-block; padding:4px 10px; border-radius:6px; font-size:11.5px; font-weight:600; font-family:var(--mono)}
+  .badge-ok{background:rgba(61,220,132,.14); color:var(--green)}
+  .badge-bad{background:rgba(255,84,112,.14); color:var(--red)}
+  .tx{font-family:var(--mono); font-size:11px; color:var(--muted); word-break:break-all; margin-top:10px}
+
+  /* web3 */
+  .web3-grid{display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:52px}
+  .terminal{
+    background:#050507; border:1px solid var(--line); border-radius:10px; padding:16px 18px;
+    font-family:var(--mono); font-size:12.5px; color:var(--muted); margin-top:18px; line-height:1.8;
+  }
+  .pipeline{margin-top:18px; font-family:var(--mono); font-size:12.5px; line-height:2; color:var(--muted)}
+  .pipeline b{color:var(--text)}
+
+  /* tech stack */
+  .stack{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:52px}
+  .stack .item{border:1px solid var(--line); border-radius:12px; padding:20px; background:var(--panel); display:flex; gap:14px; align-items:flex-start}
+  .stack .icon{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex:none;color:var(--orange-soft)}
+  .stack h3{font-size:15px; margin-bottom:5px; font-weight:600}
+  .stack p{font-size:13.3px; color:var(--muted)}
+
+  /* roadmap */
+  .roadmap{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:52px}
+  .phase{border:1px solid var(--line); border-radius:var(--radius); padding:26px; background:var(--panel); position:relative}
+  .phase.current{border-color:var(--orange); background:linear-gradient(180deg, rgba(255,94,26,.08), transparent)}
+  .phase .stage-label{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-bottom:12px; display:block}
+  .phase.current .stage-label{color:var(--orange-soft)}
+  .phase h3{font-size:17px; margin-bottom:10px; font-weight:600}
+  .phase p{font-size:13.7px; color:var(--muted)}
+  .now-flag{position:absolute; top:-11px; right:20px; background:var(--orange); color:#0a0602; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; font-family:var(--mono)}
+
+  /* status row */
+  .status-row{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:52px}
+  .status-card{border:1px solid var(--line); border-radius:var(--radius); padding:24px; background:var(--panel)}
+  .status-card .dot-label{display:flex; align-items:center; gap:8px; margin-bottom:14px; font-family:var(--mono); font-size:11.5px; color:var(--muted)}
+  .status-card .dot{width:7px;height:7px;border-radius:50%}
+  .status-card h3{font-size:16px; margin-bottom:8px; font-weight:600}
+  .status-card p{font-size:13.5px; color:var(--muted)}
+
+  /* future scope */
+  .scope-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:52px}
+  .scope{border:1px solid var(--line); border-radius:12px; padding:22px; background:var(--panel)}
+  .scope h3{font-size:15px; margin-bottom:8px; font-weight:600; color:var(--orange-soft)}
+  .scope p{font-size:13.3px; color:var(--muted)}
+
+  /* footer */
+  footer{border-top:1px solid var(--line); padding:56px 26px 40px}
+  .footer-in{max-width:1240px; margin:auto; display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap}
+  footer .brand{margin-bottom:10px}
+  footer p{color:var(--muted); font-size:13.5px; max-width:380px}
+  .footer-meta{text-align:right; font-size:13px; color:var(--muted)}
+  .footer-meta b{color:var(--text); display:block; font-weight:600; margin-bottom:2px}
+
+  @media (max-width:980px){
+    .hero-grid{grid-template-columns:1fr}
+    .stage{height:300px; order:-1}
+    .overview-grid, .web3-grid, .roadmap, .status-row{grid-template-columns:1fr}
+    .pillars, .stack, .scope-grid{grid-template-columns:repeat(2,1fr)}
+    .flow{grid-template-columns:1fr; gap:26px}
+    .flow:before{display:none}
+    .console-body{grid-template-columns:1fr}
+    .nav-links{display:none}
+    .nav-toggle{display:block}
+    section{padding:80px 22px}
+  }
+  @media (max-width:560px){
+    .pillars, .stack, .scope-grid{grid-template-columns:1fr}
+    .hero{padding:120px 20px 70px}
+    .hero-meta{gap:16px}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="fx-canvas"></canvas>
+<div class="grain"></div>
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<nav class="top">
+  <div class="nav-in">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>Attendance<br><small>on-chain · PBL-3</small></span>
+    </div>
+    <div class="nav-links" id="navLinks">
+      <a href="#overview">Overview</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#demo">Console</a>
+      <a href="#web3">Web3</a>
+      <a href="#roadmap">Roadmap</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px">
+      <div class="wallet-pill" id="walletPill"><span class="wallet-dot"></span><span id="walletPillText">Wallet disconnected</span></div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-grid">
+    <div>
+      <div class="credit-line"><span class="credit-dot"></span>PBL-3 · Mid-Term · Manipal University Jaipur · Sept 2026</div>
+      <h1>Attendance records that <em>can't quietly change</em> after the fact.</h1>
+      <p class="lede">A working prototype exploring how a Solidity smart contract, paired with performance analytics, could make classroom attendance verifiable instead of just recorded — built and iterated across two PBL cycles.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#demo">Open the attendance console</a>
+        <a class="btn btn-ghost" href="#web3">See the Web3 handshake</a>
+      </div>
+      <div class="hero-meta">
+        <div><b>2</b><span>PBL cycles of iteration</span></div>
+        <div><b>5</b><span>step attendance→analytics flow</span></div>
+        <div><b>75%</b><span>eligibility threshold modeled</span></div>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-glow"></div>
+      <div class="stage-ring"></div>
+      <div class="stage-ring"></div>
+      <div class="cube">
+        <div class="face f1"></div>
+        <div class="face f2"></div>
+        <div class="face f3"></div>
+        <div class="face f4"></div>
+        <div class="face f5"></div>
+        <div class="face f6"></div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue"><i></i>scroll</div>
+</header>
+
+<main>
+
+<section id="overview">
+  <div class="reveal">
+    <div class="kicker"><i></i>Why this project exists</div>
+    <h2 class="title">A grading system is only as good as the record it keeps.</h2>
+    <p class="sub">Attendance decides exam eligibility, yet the record of it usually lives in one spreadsheet, editable by one person, with no trace of what changed. This project treats that as a systems problem, not just a policy one.</p>
+  </div>
+  <div class="overview-grid">
+    <div class="panel problem reveal">
+      <span class="tag-sm">The gap</span>
+      <h3>Centralized records are easy to quietly edit</h3>
+      <p>A conventional spreadsheet or database has no built-in audit trail. Faculty credentials can be shared or spoofed, proxy entries go unnoticed, and by the time discrepancies surface at semester-end, there's no reliable way to reconstruct what actually happened.</p>
+    </div>
+    <div class="panel approach reveal">
+      <span class="tag-sm">The prototype</span>
+      <h3>Push attendance logic onto an immutable ledger</h3>
+      <p>Every attendance transaction is written through smart-contract logic instead of a direct database write, so it leaves a timestamped, tamper-evident trail. Performance analytics — attendance percentage, exam eligibility — are then computed directly from that record.</p>
+    </div>
+  </div>
+</section>
+
+<section id="concept">
+  <div class="reveal">
+    <div class="kicker"><i></i>Foundations</div>
+    <h2 class="title">What blockchain actually contributes here</h2>
+    <p class="sub">Four properties of a distributed ledger, and how each one maps onto an attendance problem specifically.</p>
+  </div>
+  <div class="pillars">
+    <div class="pillar reveal">
+      <div class="icon">◆</div>
+      <h3>Distributed ledger</h3>
+      <p>Records are written chronologically across a shared ledger rather than a single editable table — there's no single point where history can be rewritten.</p>
+    </div>
+    <div class="pillar reveal">
+      <div class="icon">◇</div>
+      <h3>Tamper resistance</h3>
+      <p>Once an entry is committed, altering it leaves evidence of the change instead of silently overwriting the old value.</p>
+    </div>
+    <div class="pillar reveal">
+      <div class="icon">◈</div>
+      <h3>Traceability</h3>
+      <p>Every attendance transaction carries a verifiable history — who marked it, when, and against which student ID.</p>
+    </div>
+    <div class="pillar reveal">
+      <div class="icon">◉</div>
+      <h3>Smart contracts</h3>
+      <p>Recording and retrieval logic runs as predefined code, so the same rules apply to every entry with no manual discretion.</p>
+    </div>
+  </div>
+</section>
+
+<section id="workflow">
+  <div class="reveal">
+    <div class="kicker"><i></i>System architecture</div>
+    <h2 class="title">Student → faculty → blockchain → analytics</h2>
+    <p class="sub">The prototype follows one linear path from raw input to a performance figure a student can actually check.</p>
+  </div>
+  <div class="flow">
+    <div class="flow-step reveal"><div class="flow-num">01</div><h3>Attendance input</h3><p>Student details and session info are entered through the application interface.</p></div>
+    <div class="flow-step reveal"><div class="flow-num">02</div><h3>Smart contract</h3><p>The entry is processed according to predefined contract logic — not a raw database write.</p></div>
+    <div class="flow-step reveal"><div class="flow-num">03</div><h3>Blockchain record</h3><p>The transaction is committed to the ledger with a timestamp and hash.</p></div>
+    <div class="flow-step reveal"><div class="flow-num">04</div><h3>Retrieve records</h3><p>Full attendance history for a student can be queried back out on demand.</p></div>
+    <div class="flow-step reveal"><div class="flow-num">05</div><h3>Analytics</h3><p>Attendance percentage and eligibility are calculated straight from the retrieved record.</p></div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="reveal">
+    <div class="kicker"><i></i>Working module</div>
+    <h2 class="title">Attendance & analytics console</h2>
+    <p class="sub">A browser-based simulation of the workflow above. It models the transaction and eligibility logic client-side; routing these calls through the deployed Solidity contract via MetaMask is the End-Term milestone.</p>
+  </div>
+
+  <div class="console reveal">
+    <div class="console-head">
+      <b>Transaction console</b>
+      <div style="display:flex; gap:10px; align-items:center">
+        <span class="status-chip">Prototype · local simulation</span>
+        <button class="btn btn-ghost" style="padding:7px 14px; font-size:12.5px" onclick="resetStorage()">Reset local state</button>
+      </div>
+    </div>
+    <div class="console-body">
+      <div>
+        <div class="field"><label for="roll">Student ID / roll number</label><input id="roll" type="text" placeholder="e.g. 2427030580"></div>
+        <div class="field"><label for="name">Student name</label><input id="name" type="text" placeholder="e.g. Bishwadeep Mukherjee"></div>
+        <div class="field"><label for="subject">Course module</label><input id="subject" type="text" placeholder="e.g. Distributed Computing"></div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="true">Present</option>
+            <option value="false">Absent</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="recordAttendance()">Submit record</button>
+      </div>
+      <div>
+        <div class="field"><label for="queryRoll">Audit query — student ID</label><input id="queryRoll" type="text" placeholder="Search roll number"></div>
+        <button class="btn btn-ghost btn-block" style="margin-bottom:16px" onclick="evaluateAttendance()">Run analytics audit</button>
+        <div id="outputDisplay" class="output"><span class="muted">Submit a record, or enter an ID above and run the audit to view cumulative attendance, eligibility status, and a simulated transaction trace.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="web3">
+  <div class="reveal">
+    <div class="kicker"><i></i>Protocol integration</div>
+    <h2 class="title">MetaMask & ethers.js handshake</h2>
+    <p class="sub">Currently a standalone proof-of-concept: wallet connection works end-to-end, but it isn't wired into the attendance console above yet. That wiring is the next milestone.</p>
+  </div>
+  <div class="web3-grid">
+    <div class="panel reveal">
+      <span class="tag-sm">01 — Hello World</span>
+      <h3>Connect a wallet</h3>
+      <p>Requests account access through <code>window.ethereum</code> and reads back the connected address, network and chain ID using ethers.js v6.</p>
+      <button class="btn btn-primary" style="margin-top:18px" onclick="connectWallet()">Connect MetaMask</button>
+      <div id="web3Terminal" class="terminal">Status: provider idle — awaiting handshake.</div>
+    </div>
+    <div class="panel reveal">
+      <span class="tag-sm">02 — End-term target</span>
+      <h3>Where this connects to the console</h3>
+      <p>The mid-term prototype establishes provider discovery and client-side state. The end-term release routes attendance submissions through an authenticated signer into the deployed contract.</p>
+      <div class="pipeline">
+        <div><b>1.</b> Frontend collects the attendance payload</div>
+        <div><b>2.</b> Signer requests an ECDSA signature via MetaMask</div>
+        <div><b>3.</b> Contract executes <b>markAttendance()</b> on-chain</div>
+        <div><b>4.</b> UI verifies via the <b>AttendanceLogged</b> event log</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <div class="reveal">
+    <div class="kicker"><i></i>Technical foundation</div>
+    <h2 class="title">Technologies & tools</h2>
+  </div>
+  <div class="stack">
+    <div class="item reveal"><div class="icon">◧</div><div><h3>HTML / CSS / JavaScript</h3><p>Frontend structure, styling and the application interface.</p></div></div>
+    <div class="item reveal"><div class="icon">◨</div><div><h3>Solidity</h3><p>Smart contract development for attendance logic.</p></div></div>
+    <div class="item reveal"><div class="icon">◩</div><div><h3>Remix IDE</h3><p>Compilation, deployment and testing of the smart contract.</p></div></div>
+    <div class="item reveal"><div class="icon">◪</div><div><h3>GitHub Pages</h3><p>Hosting and deployment of the project website.</p></div></div>
+    <div class="item reveal"><div class="icon">⬡</div><div><h3>MetaMask</h3><p>Wallet layer for future decentralized-application interaction.</p></div></div>
+    <div class="item reveal"><div class="icon">⬢</div><div><h3>ethers.js</h3><p>JavaScript library for wallet and contract interaction.</p></div></div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="reveal">
+    <div class="kicker"><i></i>Execution timeline</div>
+    <h2 class="title">From static prototype to a live contract</h2>
+  </div>
+  <div class="roadmap">
+    <div class="phase reveal">
+      <span class="stage-label">Phase 1 · PBL-2</span>
+      <h3>Baseline</h3>
+      <p>Static UI prototype, core problem validation, and initial smart-contract modeling tested locally in Remix IDE.</p>
+    </div>
+    <div class="phase current reveal">
+      <span class="now-flag">Current</span>
+      <span class="stage-label">Phase 2 · PBL-3</span>
+      <h3>Mid-term</h3>
+      <p>Complete interface redesign, client-side input handling, the performance-analytics module, and an ethers.js v6 wallet handshake.</p>
+    </div>
+    <div class="phase reveal">
+      <span class="stage-label">Phase 3 · End-term</span>
+      <h3>Delivery</h3>
+      <p>Smart-contract deployment to a testnet, full RPC interaction routed through the console above, and formal project documentation.</p>
+    </div>
+  </div>
+</section>
+
+<section id="status">
+  <div class="reveal">
+    <div class="kicker"><i></i>Where things stand</div>
+    <h2 class="title">Project status, honestly stated</h2>
+  </div>
+  <div class="status-row">
+    <div class="status-card reveal">
+      <div class="dot-label"><span class="dot" style="background:var(--green)"></span>Completed</div>
+      <h3>Blockchain foundation</h3>
+      <p>Solidity smart-contract logic, the attendance prototype, and baseline percentage analytics are established from PBL-2.</p>
+    </div>
+    <div class="status-card reveal">
+      <div class="dot-label"><span class="dot" style="background:var(--orange)"></span>In progress</div>
+      <h3>PBL-3 enhancement</h3>
+      <p>Redesigned interface, reorganized project showcase, and continued Web3 experimentation with MetaMask and ethers.js.</p>
+    </div>
+    <div class="status-card reveal">
+      <div class="dot-label"><span class="dot" style="background:var(--muted-2)"></span>Next</div>
+      <h3>End-term implementation</h3>
+      <p>Frontend ↔ MetaMask ↔ ethers.js ↔ smart contract wired end-to-end, then tested against real submissions.</p>
+    </div>
+  </div>
+</section>
+
+<section id="scope">
+  <div class="reveal">
+    <div class="kicker"><i></i>Beyond PBL-3</div>
+    <h2 class="title">Future scope, if the project continues into PBL-4</h2>
+  </div>
+  <div class="scope-grid">
+    <div class="scope reveal"><h3>Advanced analytics</h3><p>Deeper attendance and academic performance analysis beyond a single percentage.</p></div>
+    <div class="scope reveal"><h3>AI / ML integration</h3><p>Exploring predictive and recommendation capabilities on top of the attendance data.</p></div>
+    <div class="scope reveal"><h3>Academic application</h3><p>Additional student-facing and academic features beyond attendance alone.</p></div>
+    <div class="scope reveal"><h3>Learning management system</h3><p>Broader integration of attendance, academics and learning-related services.</p></div>
+  </div>
+  <p class="sub reveal" style="margin-top:32px">The final PBL-4 scope will be decided after evaluating PBL-3 outcomes and discussing direction with the project guide.</p>
+</section>
+
+</main>
+
+<footer>
+  <div class="footer-in">
+    <div>
+      <div class="brand"><span class="brand-mark"></span><span>Attendance<br><small>on-chain · PBL-3</small></span></div>
+      <p>A learning-oriented blockchain prototype evolving toward a complete academic application.</p>
+    </div>
+    <div class="footer-meta">
+      <b>Bishwadeep Mukherjee</b>
+      Reg. No. 2427030580 · PBL-3 Mid-Term<br>
+      Supervised by Dr. Satpal Singh Kushwaha<br>
+      Manipal University Jaipur · September 2026
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ---------------- ambient node-network canvas ---------------- */
+(function(){
+  const canvas = document.getElementById('fx-canvas');
+  const ctx = canvas.getContext('2d');
+  let w, h, nodes;
+  const COUNT = 46;
+  const COLORS = ['255,94,26','178,75,255','31,224,176','57,201,255'];
+
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = Math.min(window.innerHeight * 1.05, 980);
+    canvas.style.height = h + 'px';
+  }
+  function init(){
+    nodes = Array.from({length: COUNT}, () => ({
+      x: Math.random()*w, y: Math.random()*h,
+      vx: (Math.random()-.5)*.28, vy: (Math.random()-.5)*.28,
+      r: Math.random()*1.6 + .8,
+      c: COLORS[Math.floor(Math.random()*COLORS.length)]
+    }));
+  }
+  function step(){
+    ctx.clearRect(0,0,w,h);
+    for(const n of nodes){
+      n.x += n.vx; n.y += n.vy;
+      if(n.x < 0 || n.x > w) n.vx *= -1;
+      if(n.y < 0 || n.y > h) n.vy *= -1;
+    }
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a = nodes[i], b = nodes[j];
+        const dx=a.x-b.x, dy=a.y-b.y, d=Math.sqrt(dx*dx+dy*dy);
+        if(d < 150){
+          ctx.strokeStyle = `rgba(255,255,255,${(1-d/150)*0.06})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+    }
+    for(const n of nodes){
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${n.c},.7)`;
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    requestAnimationFrame(step);
+  }
+  window.addEventListener('resize', resize);
+  resize(); init();
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){ step(); }
+  else { step(); }
+})();
+
+/* ---------------- cursor glow ---------------- */
+(function(){
+  const glow = document.getElementById('cursorGlow');
+  if(window.matchMedia('(hover: none)').matches) return;
+  window.addEventListener('mousemove', e=>{
+    glow.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%,-50%)`;
+  });
+})();
+
+/* ---------------- scroll reveal ---------------- */
+(function(){
+  const els = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+    });
+  }, {threshold:.15, rootMargin:'0px 0px -60px 0px'});
+  els.forEach(el=>io.observe(el));
+})();
+
+/* ---------------- active nav link on scroll ---------------- */
+(function(){
+  const links = document.querySelectorAll('.nav-links a');
+  const map = {};
+  links.forEach(l => map[l.getAttribute('href').slice(1)] = l);
+  const sections = Array.from(document.querySelectorAll('section[id]'));
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(en=>{
+      const link = map[en.target.id];
+      if(!link) return;
+      if(en.isIntersecting){ links.forEach(l=>l.classList.remove('active')); link.classList.add('active'); }
+    });
+  }, {rootMargin:'-40% 0px -50% 0px'});
+  sections.forEach(s=>io.observe(s));
+})();
+
+/* ---------------- mobile nav toggle ---------------- */
+(function(){
+  const toggle = document.getElementById('navToggle');
+  const links = document.getElementById('navLinks');
+  toggle.addEventListener('click', ()=>{
+    const open = links.style.display === 'flex';
+    links.style.display = open ? 'none' : 'flex';
+    links.style.cssText += open ? '' : 'position:absolute; top:64px; left:0; right:0; background:rgba(7,7,10,.97); flex-direction:column; padding:20px 26px; border-bottom:1px solid var(--line); gap:16px;';
+  });
+  links.querySelectorAll('a').forEach(a=>a.addEventListener('click', ()=>{
+    if(window.innerWidth <= 980) links.style.display='none';
+  }));
+})();
+
+/* ---------------- sanitize helper ---------------- */
+function sanitize(str){
+  const t = document.createElement('div');
+  t.textContent = str;
+  return t.innerHTML;
+}
+
+/* ---------------- simulated tx hash ---------------- */
+function generateTxHash(){
+  const chars = '0123456789abcdef';
+  let hash = '0x';
+  for(let i=0;i<40;i++) hash += chars[Math.floor(Math.random()*chars.length)];
+  return hash;
+}
+
+/* ---------------- local attendance state ---------------- */
+const STORAGE_KEY = 'PBL3_ATTENDANCE_CACHE_V2';
+function getRecords(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw){
+    const seed = [
+      { roll:"101", name:"Student A", subject:"Network Systems", present:true, txHash:generateTxHash(), timestamp:"2026-09-12 10:30" },
+      { roll:"101", name:"Student A", subject:"Compiler Design", present:true, txHash:generateTxHash(), timestamp:"2026-09-13 11:15" },
+      { roll:"101", name:"Student A", subject:"Cloud Computing", present:false, txHash:generateTxHash(), timestamp:"2026-09-14 09:00" },
+      { roll:"102", name:"Student B", subject:"Network Systems", present:false, txHash:generateTxHash(), timestamp:"2026-09-12 10:30" }
+    ];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    return seed;
+  }
+  return JSON.parse(raw);
+}
+function saveRecord(record){
+  const current = getRecords();
+  current.push(record);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+}
+function resetStorage(){
+  localStorage.removeItem(STORAGE_KEY);
+  getRecords();
+  document.getElementById('outputDisplay').innerHTML = '<span class="muted">Local cache reset to seed values. Audit ready.</span>';
+}
+
+function recordAttendance(){
+  const roll = document.getElementById('roll').value.trim();
+  const name = document.getElementById('name').value.trim();
+  const subject = document.getElementById('subject').value.trim();
+  const present = document.getElementById('status').value === 'true';
+
+  if(!roll || !name || !subject){ alert('Fill in roll number, name and subject before submitting.'); return; }
+
+  const txHash = generateTxHash();
+  const now = new Date().toISOString().replace('T',' ').slice(0,16);
+  saveRecord({roll, name, subject, present, txHash, timestamp: now});
+
+  document.getElementById('roll').value = '';
+  document.getElementById('name').value = '';
+  document.getElementById('subject').value = '';
+
+  const out = document.getElementById('outputDisplay');
+  out.innerHTML = `
+    <div style="color:var(--green); font-weight:600; margin-bottom:8px">Entry staged to local state</div>
+    <div><b>Roll:</b> ${sanitize(roll)} &nbsp;·&nbsp; <b>Subject:</b> ${sanitize(subject)} &nbsp;·&nbsp; <b>Status:</b> ${present ? 'Present' : 'Absent'}</div>
+    <div class="tx"><b>Simulated trace:</b> ${txHash}</div>
+  `;
+}
+
+function evaluateAttendance(){
+  const query = document.getElementById('queryRoll').value.trim();
+  const out = document.getElementById('outputDisplay');
+  if(!query){ out.innerHTML = '<span class="muted">Enter a roll number to run the audit.</span>'; return; }
+
+  const records = getRecords().filter(r => r.roll === query);
+  if(!records.length){ out.innerHTML = `<span class="muted">No stored records for roll number ${sanitize(query)}.</span>`; return; }
+
+  const total = records.length;
+  const present = records.filter(r => r.present).length;
+  const pct = Math.round((present/total)*100);
+  const eligible = pct >= 75;
+
+  const trail = records.map(r =>
+    `${sanitize(r.subject)}: <b>${r.present ? 'P' : 'A'}</b> <span style="color:var(--muted-2); font-size:11px">(${r.timestamp})</span>`
+  ).join('<br>');
+
+  out.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap">
+      <span style="font-weight:600; font-size:15.5px">${sanitize(records[0].name)} · ${sanitize(query)}</span>
+      <span class="badge ${eligible ? 'badge-ok' : 'badge-bad'}">${eligible ? 'Eligible · ≥75%' : 'Shortage · <75%'}</span>
+    </div>
+    <div class="muted" style="margin-bottom:6px; font-size:13px">Audit trail</div>
+    <div style="font-size:13px; margin-bottom:10px">${trail}</div>
+    <div style="font-size:13.5px"><b>${present}/${total}</b> sessions attended (${pct}%)</div>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+  `;
+}
+
+/* ---------------- MetaMask / ethers.js handshake ---------------- */
+let provider = null, signer = null;
+
+async function connectWallet(){
+  const terminal = document.getElementById('web3Terminal');
+  const pill = document.getElementById('walletPill');
+  const pillText = document.getElementById('walletPillText');
+
+  if(!window.ethereum){
+    terminal.innerHTML = 'MetaMask was not detected. Open this page in a browser with the MetaMask extension installed.';
+    return;
+  }
+  try{
+    terminal.textContent = 'Requesting provider authentication…';
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send('eth_requestAccounts', []);
+    signer = await provider.getSigner();
+    const address = await signer.getAddress();
+    const network = await provider.getNetwork();
+    const short = address.slice(0,6) + '…' + address.slice(-4);
+
+    pill.classList.add('on');
+    pillText.textContent = short;
+
+    terminal.innerHTML = `
+      <div style="color:var(--green)"><b>Handshake established</b></div>
+      <div>Address: ${address}</div>
+      <div>Network: ${network.name} · Chain ID: ${network.chainId}</div>
+    `;
+
+    window.ethereum.on('accountsChanged', (accounts) => {
+      if(accounts.length === 0){
+        pill.classList.remove('on');
+        pillText.textContent = 'Wallet disconnected';
+        terminal.textContent = 'Wallet disconnected by client.';
+      } else {
+        connectWallet();
+      }
+    });
+    window.ethereum.on('chainChanged', () => window.location.reload());
+
+  }catch(err){
+    terminal.innerHTML = `<span style="color:var(--red)">Handshake refused:</span> ${sanitize(err.message || 'connection cancelled')}`;
+  }
+}
+</script>
+</body>
+</html>
